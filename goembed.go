@@ -28,8 +28,11 @@ func main() {
 
 	fmt.Printf("package %s\n\n", *packageFlag)
 
+	// Generate []byte(<big string constant>) instead of []byte{<list of byte values>}.
+	// The latter causes a memory explosion in the compiler (60 MB of input chews over 9 GB RAM).
+	// Doing a string conversion avoids some of that, but incurs a slight startup cost.
 	if !*gzipFlag {
-		fmt.Printf("var %s = []byte{ // %d bytes\n", *varFlag, len(raw))
+		fmt.Printf(`var %s = []byte("`, *varFlag)
 	} else {
 		var buf bytes.Buffer
 		gzw, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
@@ -45,23 +48,14 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Printf("var %s []byte // set in init\n\n", *varFlag)
-		fmt.Printf("var %s_gzip = []byte{ // %d compressed bytes (%d uncompressed bytes)\n", *varFlag, len(gz), len(raw))
+		fmt.Printf(`var %s_gzip = []byte("`, *varFlag)
 		raw = gz
 	}
 
-	const perLine = 16
-	for len(raw) > 0 {
-		n := perLine
-		if n > len(raw) {
-			n = len(raw)
-		}
-		for _, b := range raw[:n] {
-			fmt.Printf(" 0x%02x,", b)
-		}
-		fmt.Print("\n")
-		raw = raw[n:]
+	for _, b := range raw {
+		fmt.Printf("\\x%02x", b)
 	}
-	fmt.Print("}\n")
+	fmt.Println(`")`)
 }
 
 var gzipPrologue = template.Must(template.New("").Parse(`
