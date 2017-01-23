@@ -2,12 +2,12 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"text/template"
@@ -69,11 +69,6 @@ func oneVar(varName, filename string) error {
 }
 
 func oneVarReader(varName string, r io.Reader) error {
-	raw, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err
-	}
-
 	// Generate []byte(<big string constant>) instead of []byte{<list of byte values>}.
 	// The latter causes a memory explosion in the compiler (60 MB of input chews over 9 GB RAM).
 	// Doing a string conversion avoids some of that, but incurs a slight startup cost.
@@ -82,20 +77,24 @@ func oneVarReader(varName string, r io.Reader) error {
 	} else {
 		var buf bytes.Buffer
 		gzw, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
-		if _, err := gzw.Write(raw); err != nil {
+		if _, err := io.Copy(gzw, r); err != nil {
 			return err
 		}
 		if err := gzw.Close(); err != nil {
 			return err
 		}
-		gz := buf.Bytes()
-
 		fmt.Printf("var %s []byte // set in init\n\n", varName)
 		fmt.Printf(`var %s_gzip = []byte("`, varName)
-		raw = gz
+		r = &buf
 	}
 
-	io.Copy(&writer{w: os.Stdout}, bytes.NewReader(raw))
+	bufw := bufio.NewWriter(os.Stdout)
+	if _, err := io.Copy(&writer{w: bufw}, r); err != nil {
+		return err
+	}
+	if err := bufw.Flush(); err != nil {
+		return err
+	}
 	fmt.Println(`")`)
 	return nil
 }
