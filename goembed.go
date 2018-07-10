@@ -39,7 +39,7 @@ func main() {
 		fmt.Println("// Table of contents")
 		fmt.Printf("var %v = map[string][]byte{\n", *varFlag)
 		for i, filename := range flag.Args() {
-			fmt.Printf("\t%#v: %s_%d,\n", filename, *varFlag, i)
+			fmt.Printf("\t%q: %s_%d,\n", filename, *varFlag, i)
 		}
 		fmt.Println("}")
 
@@ -166,6 +166,7 @@ func init() {
 		panic(err)
 	}
 	{{ $n }}, err = ioutil.ReadAll(r)
+	{{ $.VarName }}["{{ $var }}"] = {{ $n }}
 	r.Close()
 	if err != nil {
 		panic(err)
